@@ -357,12 +357,12 @@ def adv_train(train_loader, model, criterion, optimizer, epoch, args):
     model.train()
 
     augment = nn.Sequential(
-        kornia.augmentation.RandomResizedCrop(224, scale=(0.2, 1.)),
+        kornia.augmentation.RandomResizedCrop(size=(224,224), scale=(0.2, 1.)),
         kornia.augmentation.RandomGrayscale(p=0.2),
         kornia.augmentation.ColorJitter(0.4, 0.4, 0.4, 0.4),
         kornia.augmentation.RandomHorizontalFlip(),
-        kornia.augmentation.Normalize(mean=[0.485, 0.456, 0.406],
-                                     std=[0.229, 0.224, 0.225])
+        kornia.augmentation.Normalize(mean=torch.Tensor([0.485, 0.456, 0.406]),
+                                        std=torch.Tensor([0.229, 0.224, 0.225]))
     )
 
 
