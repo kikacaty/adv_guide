@@ -27,6 +27,10 @@ import moco.builder
 
 from utils.dataloaders import get_dali_train_loader
 
+from pdb import set_trace as st
+
+import kornia
+
 
 model_names = sorted(name for name in models.__dict__
     if name.islower() and not name.startswith("__")
@@ -277,6 +281,8 @@ def main_worker(gpu, ngpus_per_node, args):
         #     train_sampler.set_epoch(epoch)
         adjust_learning_rate(optimizer, epoch, args)
 
+        st()
+
         # train for one epoch
         train(train_loader, model, criterion, optimizer, epoch, args)
 
@@ -312,6 +318,70 @@ def train(train_loader, model, criterion, optimizer, epoch, args):
         if args.gpu is not None:
             images[0] = images[0].cuda(args.gpu, non_blocking=True)
             images[1] = images[1].cuda(args.gpu, non_blocking=True)
+
+        # compute output
+        output, target = model(im_q=images[0], im_k=images[1])
+        loss = criterion(output, target)
+
+        # acc1/acc5 are (K+1)-way contrast classifier accuracy
+        # measure accuracy and record loss
+        acc1, acc5 = accuracy(output, target, topk=(1, 5))
+        losses.update(loss.item(), images[0].size(0))
+        top1.update(acc1[0], images[0].size(0))
+        top5.update(acc5[0], images[0].size(0))
+
+        # compute gradient and do SGD step
+        optimizer.zero_grad()
+        loss.backward()
+        optimizer.step()
+
+        # measure elapsed time
+        batch_time.update(time.time() - end)
+        end = time.time()
+
+        if i % args.print_freq == 0:
+            progress.display(i)
+
+def adv_train(train_loader, model, criterion, optimizer, epoch, args):
+    batch_time = AverageMeter('Time', ':6.3f')
+    data_time = AverageMeter('Data', ':6.3f')
+    losses = AverageMeter('Loss', ':.4e')
+    top1 = AverageMeter('Acc@1', ':6.2f')
+    top5 = AverageMeter('Acc@5', ':6.2f')
+    progress = ProgressMeter(
+        len(train_loader),
+        [batch_time, data_time, losses, top1, top5],
+        prefix="Epoch: [{}]".format(epoch))
+
+    # switch to train mode
+    model.train()
+
+    augment = nn.Sequential(
+        kornia.augmentation.RandomResizedCrop(224, scale=(0.2, 1.)),
+        kornia.augmentation.RandomGrayscale(p=0.2),
+        kornia.augmentation.ColorJitter(0.4, 0.4, 0.4, 0.4),
+        kornia.augmentation.RandomHorizontalFlip(),
+        kornia.augmentation.Normalize(mean=[0.485, 0.456, 0.406],
+                                     std=[0.229, 0.224, 0.225])
+    )
+
+
+    end = time.time()
+    for i, (image, _) in enumerate(train_loader):
+        # measure data loading time
+        data_time.update(time.time() - end)
+
+        images = []
+
+        # add augmented images
+        images.append(augment(image))
+        images.append(augment(image))
+
+        if args.gpu is not None:
+            images[0] = images[0].cuda(args.gpu, non_blocking=True)
+            images[1] = images[1].cuda(args.gpu, non_blocking=True)
+
+        
 
         # compute output
         output, target = model(im_q=images[0], im_k=images[1])
