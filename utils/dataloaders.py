@@ -115,7 +115,7 @@ class HybridTrainPipe(Pipeline):
             size=[crop, crop],
             interp_type=types.INTERP_LINEAR,
             random_aspect_ratio=[0.75, 4.0 / 3.0],
-            random_area=[0.08, 1.0],
+            random_area=[0.99, 1.0],
             num_attempts=100,
         )
 
@@ -128,7 +128,7 @@ class HybridTrainPipe(Pipeline):
             mean=[0.485 * 255, 0.456 * 255, 0.406 * 255],
             std=[0.229 * 255, 0.224 * 255, 0.225 * 255],
         )
-        self.coin = ops.CoinFlip(probability=0.5)
+        self.coin = ops.CoinFlip(probability=0.)
 
     def define_graph(self):
         rng = self.coin()

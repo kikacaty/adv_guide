@@ -283,7 +283,7 @@ def main_worker(gpu, ngpus_per_node, args):
 
         # train for one epoch
         # train(train_loader, model, criterion, optimizer, epoch, args)
-        adv_train(train_loader, train_loader_len, model, criterion, optimizer, epoch, args)
+        train_baseline(train_loader, train_loader_len, model, criterion, optimizer, epoch, args)
 
         if not args.multiprocessing_distributed or (args.multiprocessing_distributed
                 and args.rank % ngpus_per_node == 0):
@@ -341,7 +341,71 @@ def train(train_loader, model, criterion, optimizer, epoch, args):
         if i % args.print_freq == 0:
             progress.display(i)
 
-def adv_train(train_loader, train_loader_len, model, criterion, optimizer, epoch, args):
+def train_baseline(train_loader, train_loader_len, model, criterion, optimizer, epoch, args):
+    batch_time = AverageMeter('Time', ':6.3f')
+    data_time = AverageMeter('Data', ':6.3f')
+    losses = AverageMeter('Loss', ':.4e')
+    top1 = AverageMeter('Acc@1', ':6.2f')
+    top5 = AverageMeter('Acc@5', ':6.2f')
+    progress = ProgressMeter(
+        train_loader_len,
+        [batch_time, data_time, losses, top1, top5],
+        prefix="Epoch: [{}]".format(epoch))
+
+    # switch to train mode
+    model.train()
+
+    augment = nn.Sequential(
+        kornia.augmentation.RandomResizedCrop(size=(224,224), scale=(0.2, 1.)),
+        kornia.augmentation.RandomGrayscale(p=0.2),
+        kornia.augmentation.ColorJitter(0.4, 0.4, 0.4, 0.4),
+        kornia.augmentation.RandomHorizontalFlip(),
+        kornia.augmentation.Normalize(mean=torch.Tensor([0.485, 0.456, 0.406]),
+                std=torch.Tensor([0.229, 0.224, 0.225]))
+    )
+
+
+    end = time.time()
+    for i, (image, _) in enumerate(train_loader):
+        # measure data loading time
+        data_time.update(time.time() - end)
+
+        images = []
+
+        # add augmented images
+        images.append(augment(image))
+        images.append(augment(image))
+
+        if args.gpu is not None:
+            images[0] = images[0].cuda(args.gpu, non_blocking=True)
+            images[1] = images[1].cuda(args.gpu, non_blocking=True)
+
+        
+
+        # compute output
+        output, target = model(im_q=images[0], im_k=images[1])
+        loss = criterion(output, target)
+
+        # acc1/acc5 are (K+1)-way contrast classifier accuracy
+        # measure accuracy and record loss
+        acc1, acc5 = accuracy(output, target, topk=(1, 5))
+        losses.update(loss.item(), images[0].size(0))
+        top1.update(acc1[0], images[0].size(0))
+        top5.update(acc5[0], images[0].size(0))
+
+        # compute gradient and do SGD step
+        optimizer.zero_grad()
+        loss.backward()
+        optimizer.step()
+
+        # measure elapsed time
+        batch_time.update(time.time() - end)
+        end = time.time()
+
+        if i % args.print_freq == 0:
+            progress.display(i)
+
+def adv_train_baseline(train_loader, train_loader_len, model, criterion, optimizer, epoch, args):
     batch_time = AverageMeter('Time', ':6.3f')
     data_time = AverageMeter('Data', ':6.3f')
     losses = AverageMeter('Loss', ':.4e')
