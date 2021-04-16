@@ -224,32 +224,32 @@ def main_worker(gpu, ngpus_per_node, args):
     cudnn.benchmark = True
 
     # Data loading code
-    traindir = os.path.join(args.data, 'train')
-    normalize = transforms.Normalize(mean=[0.485, 0.456, 0.406],
-                                     std=[0.229, 0.224, 0.225])
-    if args.aug_plus:
-        # MoCo v2's aug: similar to SimCLR https://arxiv.org/abs/2002.05709
-        augmentation = [
-            transforms.RandomResizedCrop(224, scale=(0.2, 1.)),
-            transforms.RandomApply([
-                transforms.ColorJitter(0.4, 0.4, 0.4, 0.1)  # not strengthened
-            ], p=0.8),
-            transforms.RandomGrayscale(p=0.2),
-            transforms.RandomApply([moco.loader.GaussianBlur([.1, 2.])], p=0.5),
-            transforms.RandomHorizontalFlip(),
-            transforms.ToTensor(),
-            normalize
-        ]
-    else:
-        # MoCo v1's aug: the same as InstDisc https://arxiv.org/abs/1805.01978
-        augmentation = [
-            transforms.RandomResizedCrop(224, scale=(0.2, 1.)),
-            transforms.RandomGrayscale(p=0.2),
-            transforms.ColorJitter(0.4, 0.4, 0.4, 0.4),
-            transforms.RandomHorizontalFlip(),
-            transforms.ToTensor(),
-            normalize
-        ]
+    # traindir = os.path.join(args.data, 'train')
+    # normalize = transforms.Normalize(mean=[0.485, 0.456, 0.406],
+    #                                  std=[0.229, 0.224, 0.225])
+    # if args.aug_plus:
+    #     # MoCo v2's aug: similar to SimCLR https://arxiv.org/abs/2002.05709
+    #     augmentation = [
+    #         transforms.RandomResizedCrop(224, scale=(0.2, 1.)),
+    #         transforms.RandomApply([
+    #             transforms.ColorJitter(0.4, 0.4, 0.4, 0.1)  # not strengthened
+    #         ], p=0.8),
+    #         transforms.RandomGrayscale(p=0.2),
+    #         transforms.RandomApply([moco.loader.GaussianBlur([.1, 2.])], p=0.5),
+    #         transforms.RandomHorizontalFlip(),
+    #         transforms.ToTensor(),
+    #         normalize
+    #     ]
+    # else:
+    #     # MoCo v1's aug: the same as InstDisc https://arxiv.org/abs/1805.01978
+    #     augmentation = [
+    #         transforms.RandomResizedCrop(224, scale=(0.2, 1.)),
+    #         transforms.RandomGrayscale(p=0.2),
+    #         transforms.ColorJitter(0.4, 0.4, 0.4, 0.4),
+    #         transforms.RandomHorizontalFlip(),
+    #         transforms.ToTensor(),
+    #         normalize
+    #     ]
 
     # train_dataset = datasets.ImageFolder(
     #     traindir,
@@ -267,7 +267,7 @@ def main_worker(gpu, ngpus_per_node, args):
 
     # dali train/val loader
     get_train_loader = get_dali_train_loader(dali_cpu=False)
-    train_loader = get_train_loader(
+    train_loader, train_loader_len = get_train_loader(
                         args.data,
                         args.batch_size,
                         1000,
@@ -281,10 +281,9 @@ def main_worker(gpu, ngpus_per_node, args):
         #     train_sampler.set_epoch(epoch)
         adjust_learning_rate(optimizer, epoch, args)
 
-        st()
-
         # train for one epoch
-        train(train_loader, model, criterion, optimizer, epoch, args)
+        # train(train_loader, model, criterion, optimizer, epoch, args)
+        adv_train(train_loader, train_loader_len, model, criterion, optimizer, epoch, args)
 
         if not args.multiprocessing_distributed or (args.multiprocessing_distributed
                 and args.rank % ngpus_per_node == 0):
@@ -342,14 +341,14 @@ def train(train_loader, model, criterion, optimizer, epoch, args):
         if i % args.print_freq == 0:
             progress.display(i)
 
-def adv_train(train_loader, model, criterion, optimizer, epoch, args):
+def adv_train(train_loader, train_loader_len, model, criterion, optimizer, epoch, args):
     batch_time = AverageMeter('Time', ':6.3f')
     data_time = AverageMeter('Data', ':6.3f')
     losses = AverageMeter('Loss', ':.4e')
     top1 = AverageMeter('Acc@1', ':6.2f')
     top5 = AverageMeter('Acc@5', ':6.2f')
     progress = ProgressMeter(
-        len(train_loader),
+        train_loader_len,
         [batch_time, data_time, losses, top1, top5],
         prefix="Epoch: [{}]".format(epoch))
 
