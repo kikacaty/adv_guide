@@ -379,7 +379,7 @@ def train(train_loader, train_loader_len, model, criterion, optimizer, epoch, ar
     top1 = AverageMeter('Acc@1', ':6.2f')
     top5 = AverageMeter('Acc@5', ':6.2f')
     progress = ProgressMeter(
-        len(train_loader),
+        train_loader_len,
         [batch_time, data_time, losses, top1, top5],
         prefix="Epoch: [{}]".format(epoch))
 
@@ -435,7 +435,7 @@ def validate(val_loader, val_loader_len, model, criterion, args):
     top1 = AverageMeter('Acc@1', ':6.2f')
     top5 = AverageMeter('Acc@5', ':6.2f')
     progress = ProgressMeter(
-        len(val_loader),
+        val_loader_len,
         [batch_time, losses, top1, top5],
         prefix='Test: ')
 
