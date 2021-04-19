@@ -288,7 +288,9 @@ def main_worker(gpu, ngpus_per_node, args):
 
     # tracking model parameters
     if args.wandb:
-        wandb.watch(model)
+        if not args.multiprocessing_distributed or (args.multiprocessing_distributed
+                and args.rank % ngpus_per_node == 0):
+            wandb.watch(model)
 
     for epoch in range(args.start_epoch, args.epochs):
         # if args.distributed:
