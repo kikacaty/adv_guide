@@ -150,9 +150,6 @@ def main():
 def main_worker(gpu, ngpus_per_node, args):
     args.gpu = gpu
 
-    if args.wandb:
-        wandb.init(project='adv_guide', entity='yulongc')
-
     # suppress printing if not master
     if args.multiprocessing_distributed and args.gpu != 0:
         def print_pass(*args):
@@ -289,6 +286,7 @@ def main_worker(gpu, ngpus_per_node, args):
     if args.wandb:
         if not args.multiprocessing_distributed or (args.multiprocessing_distributed
                 and args.rank % ngpus_per_node == 0):
+            wandb.init(project='adv_guide', entity='yulongc')
             wandb.watch(model)
 
     for epoch in range(args.start_epoch, args.epochs):
@@ -430,7 +428,7 @@ def train_baseline(train_loader, train_loader_len, model, criterion, optimizer, 
             if not args.multiprocessing_distributed or (args.multiprocessing_distributed
                 and args.rank % ngpus_per_node == 0):
                 if args.wandb:
-                    wandb.log("Loss",loss.item(),"Acc1", acc1, "Acc5", acc5)
+                    wandb.log({"Loss":loss.item(),"Acc1": acc1, "Acc5": acc5})
 
 def adv_train_baseline(train_loader, train_loader_len, model, criterion, optimizer, epoch, args):
     batch_time = AverageMeter('Time', ':6.3f')
