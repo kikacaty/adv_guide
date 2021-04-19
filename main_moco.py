@@ -430,7 +430,8 @@ def train_baseline(train_loader, train_loader_len, model, criterion, optimizer, 
             if not args.multiprocessing_distributed or (args.multiprocessing_distributed
                 and args.rank % args.ngpus_per_node == 0):
                 if args.wandb:
-                    wandb.log({"Loss":loss.item(),"Acc1": acc1, "Acc5": acc5})
+                    wandb.log({"Loss":loss.item(),"Acc1": acc1[0], "Acc5": acc5[0]})
+                    print(loss.item(),acc1[0])
 
 def adv_train_baseline(train_loader, train_loader_len, model, criterion, optimizer, epoch, args):
     batch_time = AverageMeter('Time', ':6.3f')
