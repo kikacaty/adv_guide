@@ -115,10 +115,6 @@ parser.add_argument('--wandb', action='store_true',
 def main():
     args = parser.parse_args()
 
-    if args.wandb:
-        wandb.init(project='adv_guide', entity='yulongc')
-
-
     if args.seed is not None:
         random.seed(args.seed)
         torch.manual_seed(args.seed)
@@ -153,6 +149,9 @@ def main():
 
 def main_worker(gpu, ngpus_per_node, args):
     args.gpu = gpu
+
+    if args.wandb:
+        wandb.init(project='adv_guide', entity='yulongc')
 
     # suppress printing if not master
     if args.multiprocessing_distributed and args.gpu != 0:
