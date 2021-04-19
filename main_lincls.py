@@ -195,6 +195,7 @@ def main_worker(gpu, ngpus_per_node, args):
             print("=> loaded pre-trained model '{}'".format(args.pretrained))
         else:
             print("=> no checkpoint found at '{}'".format(args.pretrained))
+            return
 
     if args.distributed:
         # For multiprocessing distributed, DistributedDataParallel constructor
@@ -329,8 +330,11 @@ def main_worker(gpu, ngpus_per_node, args):
         return
 
     for epoch in range(args.start_epoch, args.epochs):
-        if args.distributed:
-            train_sampler.set_epoch(epoch)
+
+        # disable for dali dataset
+        # if args.distributed:
+        #     train_sampler.set_epoch(epoch)
+
         adjust_learning_rate(optimizer, epoch, args)
 
         # train for one epoch
