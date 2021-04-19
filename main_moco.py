@@ -149,6 +149,7 @@ def main():
 
 def main_worker(gpu, ngpus_per_node, args):
     args.gpu = gpu
+    args.ngpus_per_node = ngpus_per_node
 
     # suppress printing if not master
     if args.multiprocessing_distributed and args.gpu != 0:
@@ -286,6 +287,7 @@ def main_worker(gpu, ngpus_per_node, args):
     if args.wandb:
         if not args.multiprocessing_distributed or (args.multiprocessing_distributed
                 and args.rank % ngpus_per_node == 0):
+
             wandb.init(project='adv_guide', entity='yulongc')
             wandb.watch(model)
 
@@ -426,7 +428,7 @@ def train_baseline(train_loader, train_loader_len, model, criterion, optimizer, 
         if i % args.print_freq == 0:
             progress.display(i)
             if not args.multiprocessing_distributed or (args.multiprocessing_distributed
-                and args.rank % ngpus_per_node == 0):
+                and args.rank % args.ngpus_per_node == 0):
                 if args.wandb:
                     wandb.log({"Loss":loss.item(),"Acc1": acc1, "Acc5": acc5})
 
