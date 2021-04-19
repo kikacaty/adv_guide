@@ -1,0 +1,17 @@
+> /home/cxiao/yulong/moco/main_moco.py(115)main()
+-> if args.seed is not None:
+(Pdb) (Pdb) False
+(Pdb) 
+(Pdb) 
+Traceback (most recent call last):
+  File "main_moco.py", line 558, in <module>
+    main()
+  File "main_moco.py", line 115, in main
+    if args.seed is not None:
+  File "main_moco.py", line 115, in main
+    if args.seed is not None:
+  File "/home/cxiao/anaconda3/envs/py37/lib/python3.7/bdb.py", line 88, in trace_dispatch
+    return self.dispatch_line(frame)
+  File "/home/cxiao/anaconda3/envs/py37/lib/python3.7/bdb.py", line 113, in dispatch_line
+    if self.quitting: raise BdbQuit
+bdb.BdbQuit
