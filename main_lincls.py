@@ -338,10 +338,10 @@ def main_worker(gpu, ngpus_per_node, args):
         adjust_learning_rate(optimizer, epoch, args)
 
         # train for one epoch
-        train(train_loader, model, criterion, optimizer, epoch, args)
+        train(train_loader, train_loader_len, model, criterion, optimizer, epoch, args)
 
         # evaluate on validation set
-        acc1 = validate(val_loader, model, criterion, args)
+        acc1 = validate(val_loader, val_loader_len, model, criterion, args)
 
 
         # remember best acc@1 and save checkpoint
@@ -372,7 +372,7 @@ def main_worker(gpu, ngpus_per_node, args):
                 sanity_check(model.state_dict(), args.pretrained)
 
 
-def train(train_loader, model, criterion, optimizer, epoch, args):
+def train(train_loader, train_loader_len, model, criterion, optimizer, epoch, args):
     batch_time = AverageMeter('Time', ':6.3f')
     data_time = AverageMeter('Data', ':6.3f')
     losses = AverageMeter('Loss', ':.4e')
@@ -429,7 +429,7 @@ def train(train_loader, model, criterion, optimizer, epoch, args):
                     print(loss.item(),acc1[0])
 
 
-def validate(val_loader, model, criterion, args):
+def validate(val_loader, val_loader_len, model, criterion, args):
     batch_time = AverageMeter('Time', ':6.3f')
     losses = AverageMeter('Loss', ':.4e')
     top1 = AverageMeter('Acc@1', ':6.2f')
