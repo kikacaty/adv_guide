@@ -21,6 +21,16 @@ import torchvision.transforms as transforms
 import torchvision.datasets as datasets
 import torchvision.models as models
 
+# additional package
+from utils.dataloaders import get_dali_train_loader, get_dali_val_loader
+
+from pdb import set_trace as st
+
+import kornia
+
+import wandb
+
+
 model_names = sorted(name for name in models.__dict__
     if name.islower() and not name.startswith("__")
     and callable(models.__dict__[name]))
@@ -80,6 +90,14 @@ parser.add_argument('--multiprocessing-distributed', action='store_true',
 parser.add_argument('--pretrained', default='', type=str,
                     help='path to moco pretrained checkpoint')
 
+# options for wandb
+parser.add_argument('--wandb', action='store_true',
+                    help='use wandb for logging')
+
+parser.add_argument('--save-dir', default='', type=str, metavar='PATH',
+                    help='path to save checkpoint (default: none)')
+
+
 best_acc1 = 0
 
 
@@ -121,6 +139,8 @@ def main():
 def main_worker(gpu, ngpus_per_node, args):
     global best_acc1
     args.gpu = gpu
+    args.ngpus_per_node = ngpus_per_node
+
 
     # suppress printing if not master
     if args.multiprocessing_distributed and args.gpu != 0:
@@ -239,39 +259,70 @@ def main_worker(gpu, ngpus_per_node, args):
 
     cudnn.benchmark = True
 
-    # Data loading code
-    traindir = os.path.join(args.data, 'train')
-    valdir = os.path.join(args.data, 'val')
-    normalize = transforms.Normalize(mean=[0.485, 0.456, 0.406],
-                                     std=[0.229, 0.224, 0.225])
+    # ================= Data loading code ================================
+    # traindir = os.path.join(args.data, 'train')
+    # valdir = os.path.join(args.data, 'val')
+    # normalize = transforms.Normalize(mean=[0.485, 0.456, 0.406],
+    #                                  std=[0.229, 0.224, 0.225])
 
-    train_dataset = datasets.ImageFolder(
-        traindir,
-        transforms.Compose([
-            transforms.RandomResizedCrop(224),
-            transforms.RandomHorizontalFlip(),
-            transforms.ToTensor(),
-            normalize,
-        ]))
+    # train_dataset = datasets.ImageFolder(
+    #     traindir,
+    #     transforms.Compose([
+    #         transforms.RandomResizedCrop(224),
+    #         transforms.RandomHorizontalFlip(),
+    #         transforms.ToTensor(),
+    #         normalize,
+    #     ]))
 
-    if args.distributed:
-        train_sampler = torch.utils.data.distributed.DistributedSampler(train_dataset)
-    else:
-        train_sampler = None
+    # if args.distributed:
+    #     train_sampler = torch.utils.data.distributed.DistributedSampler(train_dataset)
+    # else:
+    #     train_sampler = None
 
-    train_loader = torch.utils.data.DataLoader(
-        train_dataset, batch_size=args.batch_size, shuffle=(train_sampler is None),
-        num_workers=args.workers, pin_memory=True, sampler=train_sampler)
+    # train_loader = torch.utils.data.DataLoader(
+    #     train_dataset, batch_size=args.batch_size, shuffle=(train_sampler is None),
+    #     num_workers=args.workers, pin_memory=True, sampler=train_sampler)
 
-    val_loader = torch.utils.data.DataLoader(
-        datasets.ImageFolder(valdir, transforms.Compose([
-            transforms.Resize(256),
-            transforms.CenterCrop(224),
-            transforms.ToTensor(),
-            normalize,
-        ])),
-        batch_size=args.batch_size, shuffle=False,
-        num_workers=args.workers, pin_memory=True)
+    # val_loader = torch.utils.data.DataLoader(
+    #     datasets.ImageFolder(valdir, transforms.Compose([
+    #         transforms.Resize(256),
+    #         transforms.CenterCrop(224),
+    #         transforms.ToTensor(),
+    #         normalize,
+    #     ])),
+    #     batch_size=args.batch_size, shuffle=False,
+    #     num_workers=args.workers, pin_memory=True)
+
+    # ================= Data loading code ================================
+
+
+
+    # %%%%%%%%%%%%%%%%%%%%  dali data loading code %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+    get_train_loader = get_dali_train_loader(dali_cpu=False)
+    train_loader, train_loader_len = get_train_loader(
+                        args.data,
+                        args.batch_size,
+                        1000,
+                        False,
+                        workers=args.workers
+                    )
+    get_val_loader = get_dali_val_loader()
+    val_loader, val_loader_len = get_val_loader(
+        args.data,
+        args.batch_size,
+        1000,
+        False,
+    )
+    # %%%%%%%%%%%%%%%%%%%%  dali data loading code %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+    # tracking model parameters
+    if args.wandb:
+        if not args.multiprocessing_distributed or (args.multiprocessing_distributed
+                and args.rank % ngpus_per_node == 0):
+
+            wandb.init(project='adv_guide', entity='yulongc')
+            wandb.watch(model)
+
 
     if args.evaluate:
         validate(val_loader, model, criterion, args)
@@ -288,19 +339,31 @@ def main_worker(gpu, ngpus_per_node, args):
         # evaluate on validation set
         acc1 = validate(val_loader, model, criterion, args)
 
+
         # remember best acc@1 and save checkpoint
         is_best = acc1 > best_acc1
         best_acc1 = max(acc1, best_acc1)
 
         if not args.multiprocessing_distributed or (args.multiprocessing_distributed
                 and args.rank % ngpus_per_node == 0):
+
+            # wandb logging val acc1
+            wandb.log({'Val acc1': acc1})
+
+            if args.save_dir:
+                if not os.path.exists(args.save_dir):
+                    os.makedirs(args.save_dir)
+                filename = os.path.join(args.save_dir,'cls_latest.pth.tar')
+            else:
+                filename = 'cls_latest.pth.tar'
+            
             save_checkpoint({
                 'epoch': epoch + 1,
                 'arch': args.arch,
                 'state_dict': model.state_dict(),
                 'best_acc1': best_acc1,
                 'optimizer' : optimizer.state_dict(),
-            }, is_best)
+            }, is_best, filename=filename)
             if epoch == args.start_epoch:
                 sanity_check(model.state_dict(), args.pretrained)
 
@@ -355,6 +418,11 @@ def train(train_loader, model, criterion, optimizer, epoch, args):
 
         if i % args.print_freq == 0:
             progress.display(i)
+            if not args.multiprocessing_distributed or (args.multiprocessing_distributed
+                and args.rank % args.ngpus_per_node == 0):
+                if args.wandb:
+                    wandb.log({"Loss":loss.item(),"Acc1": acc1[0], "Acc5": acc5[0]})
+                    print(loss.item(),acc1[0])
 
 
 def validate(val_loader, model, criterion, args):
