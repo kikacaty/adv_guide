@@ -326,7 +326,7 @@ def main_worker(gpu, ngpus_per_node, args):
 
 
     if args.evaluate:
-        validate(val_loader, model, criterion, args)
+        validate(val_loader, val_loader_len, model, criterion, args)
         return
 
     for epoch in range(args.start_epoch, args.epochs):
@@ -357,9 +357,9 @@ def main_worker(gpu, ngpus_per_node, args):
             if args.save_dir:
                 if not os.path.exists(args.save_dir):
                     os.makedirs(args.save_dir)
-                filename = os.path.join(args.save_dir,'cls_latest.pth.tar')
+                filename = os.path.join(args.save_dir, 'checkpoint_{:04d}.pth.tar'.format(epoch))
             else:
-                filename = 'cls_latest.pth.tar'
+                filename = 'clcheckpoint_{:04d}.pth.tar'.format(epoch)
             
             save_checkpoint({
                 'epoch': epoch + 1,
