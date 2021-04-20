@@ -401,6 +401,11 @@ def train(train_loader, train_loader_len, model, criterion, optimizer, epoch, ar
             images = images.cuda(args.gpu, non_blocking=True)
         target = target.cuda(args.gpu, non_blocking=True)
 
+        norm = kornia.augmentation.Normalize(mean=torch.Tensor([0.485, 0.456, 0.406]),
+                                          std=torch.Tensor([0.229, 0.224, 0.225]))
+        images = norm(images)
+
+
         # compute output
         output = model(images)
         loss = criterion(output, target)
@@ -448,6 +453,10 @@ def validate(val_loader, val_loader_len, model, criterion, args):
             if args.gpu is not None:
                 images = images.cuda(args.gpu, non_blocking=True)
             target = target.cuda(args.gpu, non_blocking=True)
+
+            norm = kornia.augmentation.Normalize(mean=torch.Tensor([0.485, 0.456, 0.406]),
+                                                 std=torch.Tensor([0.229, 0.224, 0.225]))
+            images = norm(images)
 
             # compute output
             output = model(images)
