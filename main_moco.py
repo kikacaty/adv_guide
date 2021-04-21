@@ -257,7 +257,7 @@ def main_worker(gpu, ngpus_per_node, args):
             normalize
         ]
 
-        toTensor = [transforms.toTensor]
+        toTensor = [transforms.ToTensor]
 
     train_dataset = datasets.ImageFolder(
         traindir,
