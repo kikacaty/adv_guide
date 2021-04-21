@@ -261,59 +261,60 @@ def main_worker(gpu, ngpus_per_node, args):
     cudnn.benchmark = True
 
     # ================= Data loading code ================================
-    # traindir = os.path.join(args.data, 'train')
-    # valdir = os.path.join(args.data, 'val')
-    # normalize = transforms.Normalize(mean=[0.485, 0.456, 0.406],
-    #                                  std=[0.229, 0.224, 0.225])
+    
+    traindir = os.path.join(args.data, 'train')
+    valdir = os.path.join(args.data, 'val')
+    normalize = transforms.Normalize(mean=[0.485, 0.456, 0.406],
+                                     std=[0.229, 0.224, 0.225])
 
-    # train_dataset = datasets.ImageFolder(
-    #     traindir,
-    #     transforms.Compose([
-    #         transforms.RandomResizedCrop(224),
-    #         transforms.RandomHorizontalFlip(),
-    #         transforms.ToTensor(),
-    #         normalize,
-    #     ]))
+    train_dataset = datasets.ImageFolder(
+        traindir,
+        transforms.Compose([
+            transforms.RandomResizedCrop(224),
+            transforms.RandomHorizontalFlip(),
+            transforms.ToTensor(),
+            normalize,
+        ]))
 
-    # if args.distributed:
-    #     train_sampler = torch.utils.data.distributed.DistributedSampler(train_dataset)
-    # else:
-    #     train_sampler = None
+    if args.distributed:
+        train_sampler = torch.utils.data.distributed.DistributedSampler(train_dataset)
+    else:
+        train_sampler = None
 
-    # train_loader = torch.utils.data.DataLoader(
-    #     train_dataset, batch_size=args.batch_size, shuffle=(train_sampler is None),
-    #     num_workers=args.workers, pin_memory=True, sampler=train_sampler)
+    train_loader = torch.utils.data.DataLoader(
+        train_dataset, batch_size=args.batch_size, shuffle=(train_sampler is None),
+        num_workers=args.workers, pin_memory=True, sampler=train_sampler)
 
-    # val_loader = torch.utils.data.DataLoader(
-    #     datasets.ImageFolder(valdir, transforms.Compose([
-    #         transforms.Resize(256),
-    #         transforms.CenterCrop(224),
-    #         transforms.ToTensor(),
-    #         normalize,
-    #     ])),
-    #     batch_size=args.batch_size, shuffle=False,
-    #     num_workers=args.workers, pin_memory=True)
+    val_loader = torch.utils.data.DataLoader(
+        datasets.ImageFolder(valdir, transforms.Compose([
+            transforms.Resize(256),
+            transforms.CenterCrop(224),
+            transforms.ToTensor(),
+            normalize,
+        ])),
+        batch_size=args.batch_size, shuffle=False,
+        num_workers=args.workers, pin_memory=True)
 
     # ================= Data loading code ================================
 
 
 
     # %%%%%%%%%%%%%%%%%%%%  dali data loading code %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-    get_train_loader = get_dali_train_loader(dali_cpu=False)
-    train_loader, train_loader_len = get_train_loader(
-                        args.data,
-                        args.batch_size,
-                        1000,
-                        False,
-                        workers=args.workers
-                    )
-    get_val_loader = get_dali_val_loader()
-    val_loader, val_loader_len = get_val_loader(
-        args.data,
-        args.batch_size,
-        1000,
-        False,
-    )
+    # get_train_loader = get_dali_train_loader(dali_cpu=False)
+    # train_loader, train_loader_len = get_train_loader(
+    #                     args.data,
+    #                     args.batch_size,
+    #                     1000,
+    #                     False,
+    #                     workers=args.workers
+    #                 )
+    # get_val_loader = get_dali_val_loader()
+    # val_loader, val_loader_len = get_val_loader(
+    #     args.data,
+    #     args.batch_size,
+    #     1000,
+    #     False,
+    # )
     # %%%%%%%%%%%%%%%%%%%%  dali data loading code %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
     # tracking model parameters
@@ -326,22 +327,22 @@ def main_worker(gpu, ngpus_per_node, args):
 
 
     if args.evaluate:
-        validate(val_loader, val_loader_len, model, criterion, args)
+        validate(val_loader, model, criterion, args)
         return
 
     for epoch in range(args.start_epoch, args.epochs):
 
         # disable for dali dataset
-        # if args.distributed:
-        #     train_sampler.set_epoch(epoch)
+        if args.distributed:
+            train_sampler.set_epoch(epoch)
 
         adjust_learning_rate(optimizer, epoch, args)
 
         # train for one epoch
-        train(train_loader, train_loader_len, model, criterion, optimizer, epoch, args)
+        train(train_loader, model, criterion, optimizer, epoch, args)
 
         # evaluate on validation set
-        acc1 = validate(val_loader, val_loader_len, model, criterion, args)
+        acc1 = validate(val_loader, model, criterion, args)
 
 
         # remember best acc@1 and save checkpoint
@@ -372,14 +373,14 @@ def main_worker(gpu, ngpus_per_node, args):
                 sanity_check(model.state_dict(), args.pretrained)
 
 
-def train(train_loader, train_loader_len, model, criterion, optimizer, epoch, args):
+def train(train_loader, model, criterion, optimizer, epoch, args):
     batch_time = AverageMeter('Time', ':6.3f')
     data_time = AverageMeter('Data', ':6.3f')
     losses = AverageMeter('Loss', ':.4e')
     top1 = AverageMeter('Acc@1', ':6.2f')
     top5 = AverageMeter('Acc@5', ':6.2f')
     progress = ProgressMeter(
-        train_loader_len,
+        len(train_loader),
         [batch_time, data_time, losses, top1, top5],
         prefix="Epoch: [{}]".format(epoch))
 
@@ -400,11 +401,6 @@ def train(train_loader, train_loader_len, model, criterion, optimizer, epoch, ar
         if args.gpu is not None:
             images = images.cuda(args.gpu, non_blocking=True)
         target = target.cuda(args.gpu, non_blocking=True)
-
-        norm = kornia.augmentation.Normalize(mean=torch.Tensor([0.485, 0.456, 0.406]),
-                                          std=torch.Tensor([0.229, 0.224, 0.225]))
-        images = norm(images)
-
 
         # compute output
         output = model(images)
@@ -431,16 +427,15 @@ def train(train_loader, train_loader_len, model, criterion, optimizer, epoch, ar
                 and args.rank % args.ngpus_per_node == 0):
                 if args.wandb:
                     wandb.log({"Loss":loss.item(),"Acc1": acc1[0], "Acc5": acc5[0]})
-                    print(loss.item(),acc1[0])
 
 
-def validate(val_loader, val_loader_len, model, criterion, args):
+def validate(val_loader, model, criterion, args):
     batch_time = AverageMeter('Time', ':6.3f')
     losses = AverageMeter('Loss', ':.4e')
     top1 = AverageMeter('Acc@1', ':6.2f')
     top5 = AverageMeter('Acc@5', ':6.2f')
     progress = ProgressMeter(
-        val_loader_len,
+        len(val_loader),
         [batch_time, losses, top1, top5],
         prefix='Test: ')
 
@@ -454,9 +449,6 @@ def validate(val_loader, val_loader_len, model, criterion, args):
                 images = images.cuda(args.gpu, non_blocking=True)
             target = target.cuda(args.gpu, non_blocking=True)
 
-            norm = kornia.augmentation.Normalize(mean=torch.Tensor([0.485, 0.456, 0.406]),
-                                                 std=torch.Tensor([0.229, 0.224, 0.225]))
-            images = norm(images)
 
             # compute output
             output = model(images)
