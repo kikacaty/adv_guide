@@ -18,12 +18,13 @@ class TwoCropsTransform:
 class TwoCropsTransformNew:
     """Take two random crops of one image as the query and key."""
 
-    def __init__(self, base_transform):
+    def __init__(self, base_transform, base_transform_new):
         self.base_transform = base_transform
+        self.base_transform_new = base_transform_new
 
     def __call__(self, x):
         q = self.base_transform(x)
-        k = x
+        k = self.base_transform_new(x)
         return [q, k]
 
 

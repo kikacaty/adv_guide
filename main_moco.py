@@ -257,9 +257,11 @@ def main_worker(gpu, ngpus_per_node, args):
             normalize
         ]
 
+        toTensor = [transforms.toTensor]
+
     train_dataset = datasets.ImageFolder(
         traindir,
-        moco.loader.TwoCropsTransformNew(transforms.Compose(augmentation)))
+        moco.loader.TwoCropsTransformNew(transforms.Compose(augmentation),transforms.Compose(toTensor)))
 
     if args.distributed:
         train_sampler = torch.utils.data.distributed.DistributedSampler(train_dataset)
