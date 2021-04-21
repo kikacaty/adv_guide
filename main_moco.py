@@ -259,7 +259,7 @@ def main_worker(gpu, ngpus_per_node, args):
 
     train_dataset = datasets.ImageFolder(
         traindir,
-        moco.loader.TwoCropsTransform(transforms.Compose(augmentation)))
+        moco.loader.TwoCropsTransformNew(transforms.Compose(augmentation)))
 
     if args.distributed:
         train_sampler = torch.utils.data.distributed.DistributedSampler(train_dataset)
@@ -379,15 +379,11 @@ def train_baseline(train_loader, model, criterion, optimizer, epoch, args):
 
 
     end = time.time()
-    for i, (image, _) in enumerate(train_loader):
+    for i, (images, _) in enumerate(train_loader):
         # measure data loading time
         data_time.update(time.time() - end)
 
-        images = []
-
-        # add augmented images
-        images.append(augment(image))
-        images.append(augment(image))
+        images[1] = augment(images[1])
 
         if args.gpu is not None:
             images[0] = images[0].cuda(args.gpu, non_blocking=True)
