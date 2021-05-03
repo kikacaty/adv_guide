@@ -418,7 +418,7 @@ def train_baseline(train_loader, model, criterion, optimizer, epoch, args):
 
         # compute gradient and do SGD step
         optimizer.zero_grad()
-        if half: 
+        if args.half: 
             with amp.scale_loss(loss, optimizer) as scaled_loss: 
                 scaled_loss.backward()
         else:
