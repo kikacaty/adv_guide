@@ -29,6 +29,7 @@ from pdb import set_trace as st
 
 import kornia
 from apex import amp
+from apex.parallel import DistributedDataParallel as DDP
 
 import wandb
 
