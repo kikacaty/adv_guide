@@ -28,6 +28,7 @@ import moco.builder
 from pdb import set_trace as st
 
 import kornia
+from apex import amp
 
 import wandb
 
@@ -109,6 +110,10 @@ parser.add_argument('--cos', action='store_true',
 parser.add_argument('--wandb', action='store_true',
                     help='use wandb for logging')
 
+# options for apex
+parser.add_argument('--half', action='store_true',
+                    help='use half precision')
+
 
 def main():
     args = parser.parse_args()
@@ -172,6 +177,16 @@ def main_worker(gpu, ngpus_per_node, args):
     model = moco.builder.MoCo(
         models.__dict__[args.arch],
         args.moco_dim, args.moco_k, args.moco_m, args.moco_t, args.mlp)
+
+    # define loss function (criterion) and optimizer
+    criterion = nn.CrossEntropyLoss().cuda(args.gpu)
+
+    optimizer = torch.optim.SGD(model.parameters(), args.lr,
+                                momentum=args.momentum,
+                                weight_decay=args.weight_decay)
+
+    if args.half:
+        model, optimizer = amp.initialize(model, optimizer, opt_level="O1")
     print(model)
 
     if args.distributed:
@@ -201,13 +216,6 @@ def main_worker(gpu, ngpus_per_node, args):
         # AllGather implementation (batch shuffle, queue update, etc.) in
         # this code only supports DistributedDataParallel.
         raise NotImplementedError("Only DistributedDataParallel is supported.")
-
-    # define loss function (criterion) and optimizer
-    criterion = nn.CrossEntropyLoss().cuda(args.gpu)
-
-    optimizer = torch.optim.SGD(model.parameters(), args.lr,
-                                momentum=args.momentum,
-                                weight_decay=args.weight_decay)
 
     # optionally resume from a checkpoint
     if args.resume:
@@ -389,11 +397,11 @@ def train_baseline(train_loader, model, criterion, optimizer, epoch, args):
         # measure data loading time
         data_time.update(time.time() - end)
 
-        images[1] = augment(images[1])
-
         if args.gpu is not None:
             images[0] = images[0].cuda(args.gpu, non_blocking=True)
             images[1] = images[1].cuda(args.gpu, non_blocking=True)
+
+        images[1] = augment(images[1])
 
         
 
@@ -410,7 +418,11 @@ def train_baseline(train_loader, model, criterion, optimizer, epoch, args):
 
         # compute gradient and do SGD step
         optimizer.zero_grad()
-        loss.backward()
+        if half: 
+            with amp.scale_loss(loss, optimizer) as scaled_loss: 
+                scaled_loss.backward()
+        else:
+            loss.backward()
         optimizer.step()
 
         # measure elapsed time

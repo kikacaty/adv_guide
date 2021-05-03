@@ -3,5 +3,4 @@ python -u main_moco.py \
   --lr 0.03 \
   --batch-size 256 \
   --dist-url 'tcp://localhost:10001' --multiprocessing-distributed --world-size 1 --rank 0 \
-  --save-dir /workspace/yulong/guide_results/models/test_baseline \
-  ~/imgnet $@
+  --save-dir /workspace/yulong/guide_results/models/test_baseline $@
