@@ -270,9 +270,8 @@ def main_worker(gpu, ngpus_per_node, args):
         ]
 
         preprocess = [
-            transforms.Resize(256),
-                    transforms.CenterCrop(224),
-                    transforms.ToTensor()
+            transforms.RandomResizedCrop(224, scale=(0.2, 1.)),
+            transforms.ToTensor()
                     ]
 
     train_dataset = datasets.ImageFolder(
@@ -387,7 +386,6 @@ def train_baseline(train_loader, model, criterion, optimizer, epoch, args):
     model.train()
 
     augment = nn.Sequential(
-        kornia.augmentation.RandomResizedCrop(size=(224,224), scale=(0.2, 1.)),
         kornia.augmentation.RandomGrayscale(p=0.2),
         kornia.augmentation.ColorJitter(0.4, 0.4, 0.4, 0.4),
         kornia.augmentation.RandomHorizontalFlip(),
@@ -448,7 +446,7 @@ def adv_train_baseline(train_loader, train_loader_len, model, criterion, optimiz
     top1 = AverageMeter('Acc@1', ':6.2f')
     top5 = AverageMeter('Acc@5', ':6.2f')
     progress = ProgressMeter(
-        train_loader_len,
+        len(train_loader),
         [batch_time, data_time, losses, top1, top5],
         prefix="Epoch: [{}]".format(epoch))
 
@@ -461,24 +459,20 @@ def adv_train_baseline(train_loader, train_loader_len, model, criterion, optimiz
         kornia.augmentation.ColorJitter(0.4, 0.4, 0.4, 0.4),
         kornia.augmentation.RandomHorizontalFlip(),
         kornia.augmentation.Normalize(mean=torch.Tensor([0.485, 0.456, 0.406]),
-                                        std=torch.Tensor([0.229, 0.224, 0.225]))
+                std=torch.Tensor([0.229, 0.224, 0.225]))
     )
 
 
     end = time.time()
-    for i, (image, _) in enumerate(train_loader):
+    for i, (images, _) in enumerate(train_loader):
         # measure data loading time
         data_time.update(time.time() - end)
-
-        images = []
-
-        # add augmented images
-        images.append(augment(image))
-        images.append(augment(image))
 
         if args.gpu is not None:
             images[0] = images[0].cuda(args.gpu, non_blocking=True)
             images[1] = images[1].cuda(args.gpu, non_blocking=True)
+
+        images[1] = augment(images[1])
 
         
 
@@ -495,7 +489,11 @@ def adv_train_baseline(train_loader, train_loader_len, model, criterion, optimiz
 
         # compute gradient and do SGD step
         optimizer.zero_grad()
-        loss.backward()
+        if args.half: 
+            with amp.scale_loss(loss, optimizer) as scaled_loss: 
+                scaled_loss.backward()
+        else:
+            loss.backward()
         optimizer.step()
 
         # measure elapsed time
@@ -504,6 +502,11 @@ def adv_train_baseline(train_loader, train_loader_len, model, criterion, optimiz
 
         if i % args.print_freq == 0:
             progress.display(i)
+            if not args.multiprocessing_distributed or (args.multiprocessing_distributed
+                and args.rank % args.ngpus_per_node == 0):
+                if args.wandb:
+                    wandb.log({"Loss":loss.item(),"Acc1": acc1[0], "Acc5": acc5[0]})
+                    print(loss.item(),acc1[0])
 
 
 def save_checkpoint(state, is_best, filename='checkpoint.pth.tar'):
