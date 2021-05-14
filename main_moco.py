@@ -454,7 +454,6 @@ def adv_train_baseline(train_loader, train_loader_len, model, criterion, optimiz
     model.train()
 
     augment = nn.Sequential(
-        kornia.augmentation.RandomResizedCrop(size=(224,224), scale=(0.2, 1.)),
         kornia.augmentation.RandomGrayscale(p=0.2),
         kornia.augmentation.ColorJitter(0.4, 0.4, 0.4, 0.4),
         kornia.augmentation.RandomHorizontalFlip(),
