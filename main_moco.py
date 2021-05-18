@@ -461,6 +461,8 @@ def adv_train_baseline(train_loader, train_loader_len, model, criterion, optimiz
                 std=torch.Tensor([0.229, 0.224, 0.225]))
     )
 
+    
+
 
     end = time.time()
     for i, (images, _) in enumerate(train_loader):

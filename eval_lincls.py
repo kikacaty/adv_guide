@@ -184,7 +184,7 @@ def main_worker(gpu, ngpus_per_node, args):
         model.fc.bias.data.zero_()
 
         # load from pre-trained, before DistributedDataParallel constructor
-        args.pretrained = '/workspace/yulong/guide_results/models/baseline-tmp-32Gx4-new/checkpoint_{:04d}.pth.tar'.format(pretrained_id)
+        args.pretrained = '/workspace/yulong/guide_results/models/baseline-tmp-32Gx4-aug-new/checkpoint_{:04d}.pth.tar'.format(pretrained_id)
         if args.pretrained:
             if os.path.isfile(args.pretrained):
                 print("=> loading checkpoint '{}'".format(args.pretrained))
